@@ -78,10 +78,10 @@ def test_counterfactual_runner_scaffold_methods_have_smoke_paths() -> None:
     replaced = runner.replace_action(0, answer_id)
     nulled = runner.null_action(0)
 
-    assert removed.mode == "remove_action"
-    assert removed.replay_result.steps == []
-    assert replaced.mode == "replace_action"
-    assert len(replaced.replay_result.steps) == 1
-    assert replaced.replay_result.steps[0].transition.terminated is True
-    assert nulled.mode == "null_action"
-    assert nulled.replay_result.steps == []
+    assert removed.mode == "remove"
+    assert removed.metadata["counterfactual_actions"] == []
+    assert replaced.mode == "replace"
+    assert replaced.counterfactual_action == answer_id
+    assert replaced.counterfactual_eval.score == 0.0
+    assert nulled.mode == "null"
+    assert nulled.metadata["counterfactual_actions"] == []

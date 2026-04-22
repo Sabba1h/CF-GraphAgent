@@ -88,6 +88,8 @@ class CandidateGenerator:
         ranked_edges = sorted(candidate_edges.values(), key=lambda item: (-item[1], item[0].edge_id))
         actions: list[CandidateAction] = []
         for edge, score in ranked_edges[: self.top_k]:
+            src_attrs = graph_store.get_node_attributes(edge.src)
+            dst_attrs = graph_store.get_node_attributes(edge.dst)
             actions.append(
                 CandidateAction(
                     candidate_id=len(actions),
@@ -95,7 +97,15 @@ class CandidateGenerator:
                     edge_id=edge.edge_id,
                     score=score,
                     description=self._build_edge_description(edge=edge, repeated=edge.edge_id in working_memory.working_edge_ids),
-                    metadata={"src": edge.src, "dst": edge.dst, "relation": edge.relation},
+                    metadata={
+                        "src": edge.src,
+                        "dst": edge.dst,
+                        "relation": edge.relation,
+                        "src_text": self._node_text(src_attrs, edge.src),
+                        "dst_text": self._node_text(dst_attrs, edge.dst),
+                        "src_node_type": str(src_attrs.get("node_type") or ""),
+                        "dst_node_type": str(dst_attrs.get("node_type") or ""),
+                    },
                 )
             )
 
@@ -135,3 +145,8 @@ class CandidateGenerator:
         if repeated:
             return f"{base} (already in working subgraph)"
         return base
+
+    def _node_text(self, attrs: dict[str, object], fallback: str) -> str:
+        """Expose only whitelisted node text for transparent relevance scoring."""
+
+        return str(attrs.get("text") or attrs.get("name") or fallback)

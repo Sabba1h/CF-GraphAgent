@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from schemas import AnswerResult, EvalResult, RewardBreakdown, RewardResult
+from reward.counterfactual import CounterfactualRewardEngine
+from schemas import AnswerResult, CounterfactualComparisonResult, EvalResult, RewardBreakdown, RewardResult
 
 
 class RewardEngine:
     """Encapsulate stage-1 reward rules and future extension hooks."""
+
+    def __init__(self, *, counterfactual_reward_engine: CounterfactualRewardEngine | None = None) -> None:
+        self.counterfactual_reward_engine = counterfactual_reward_engine or CounterfactualRewardEngine()
 
     def reward_for_expand(self, *, is_valid: bool, is_repeated: bool) -> RewardResult:
         """Return the reward for an expand action."""
@@ -28,8 +32,39 @@ class RewardEngine:
         score = eval_result.score if isinstance(eval_result, EvalResult) else eval_result.reward
         return self._result(total=score, reason="answer", task_reward=score)
 
-    def compute_counterfactual_bonus(self, *args, **kwargs) -> float:
-        """Placeholder for stage-2 counterfactual reward extensions."""
+    def compute_counterfactual_bonus(self, comparison: CounterfactualComparisonResult | None = None) -> float:
+        """Return a counterfactual delta only when explicitly requested."""
+
+        if comparison is None:
+            return 0.0
+        return self.counterfactual_reward_engine.compute(comparison).counterfactual_reward
+
+    def merge_counterfactual_reward(
+        self,
+        *,
+        base_reward: RewardResult,
+        comparison: CounterfactualComparisonResult,
+    ) -> RewardResult:
+        """Return a new RewardResult with an opt-in counterfactual delta."""
+
+        counterfactual_result = self.counterfactual_reward_engine.compute(comparison)
+        base_breakdown = base_reward.breakdown or RewardBreakdown(total_reward=base_reward.reward)
+        breakdown = RewardBreakdown(
+            task_reward=base_breakdown.task_reward,
+            process_reward=base_breakdown.process_reward,
+            constraint_penalty=base_breakdown.constraint_penalty,
+            counterfactual_reward=counterfactual_result.counterfactual_reward,
+            total_reward=base_breakdown.total_reward + counterfactual_result.counterfactual_reward,
+        )
+        return RewardResult(
+            reward=breakdown.total_reward,
+            reason=f"{base_reward.reason}+counterfactual",
+            counterfactual_bonus=counterfactual_result.counterfactual_reward,
+            breakdown=breakdown,
+        )
+
+    def compute_counterfactual_placeholder(self) -> float:
+        """Compatibility placeholder for callers that only need zero by default."""
 
         return 0.0
 

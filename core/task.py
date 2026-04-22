@@ -12,5 +12,6 @@ class TaskSample:
 
     query: str
     ground_truth: str | None = None
+    dataset_name: str | None = None
     seed_entities: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
